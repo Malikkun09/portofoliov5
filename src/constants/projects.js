@@ -101,28 +101,33 @@ const projects = [
     fluidColor: '#0028FF',
     images: [
       {
+        src: '/project3/9.webp',
+        tag: 'big',
+        isRight: false,
+      },
+      {
+        src: '/project3/10.webp',
+        tag: 'big',
+        isRight: false,
+      },
+      {
+        src: '/project3/11.webp',
+        tag: 'big',
+        isRight: false,
+      },
+      {
+        src: '/project3/12.webp',
+        tag: 'medium',
+        isRight: false,
+      },
+      {
         src: '/project3/1.webp',
-        tag: 'big',
-        isRight: false,
-      },
-      {
-        src: '/project3/5.webp',
-        tag: 'small',
-        isRight: false,
-      },
-      {
-        src: '/project3/8.webp',
-        tag: 'small',
-        isRight: true,
-      },
-      {
-        src: '/project3/2.webp',
-        tag: 'big',
+        tag: 'medium',
         isRight: false,
       },
       {
         src: '/project3/3.webp',
-        tag: 'big',
+        tag: 'medium',
         isRight: false,
       },
     ],
