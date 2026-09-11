@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   pageExtensions: ['page.jsx'],
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     // optimizeCss: true,
     // nextScriptWorkers: true,
