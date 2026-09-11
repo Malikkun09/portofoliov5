@@ -19,6 +19,15 @@
     height: 9vw;
     padding: 0 4vw 0 4vw;
   }
+
+  &.compact {
+    height: 2.1vw;
+    padding: 0 1.1vw;
+    @include mobile {
+      height: 8vw;
+      padding: 0 3.2vw;
+    }
+  }
   &:hover {
     .ball {
       width: 25vw;

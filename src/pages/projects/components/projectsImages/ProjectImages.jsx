@@ -3,6 +3,7 @@
 import { Fragment, useCallback } from 'react';
 
 import Image from 'next/image';
+import ProjectVideo from '@src/components/dom/projectVideo/Index';
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
 import styles from '@src/pages/projects/components/projectsImages/styles/projectImages.module.scss';
@@ -16,9 +17,7 @@ function ProjectImages({ project }) {
       if (tag === 'video') {
         return (
           <div className={styles.videoContainer}>
-            <video loop muted autoPlay>
-              <source src={src} type="video/mp4" />
-            </video>
+            <ProjectVideo src={src} title={title} />
           </div>
         );
       }

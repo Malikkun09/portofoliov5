@@ -63,6 +63,19 @@ function MenuLinks() {
     }
   }, [isMenuOpen]);
 
+  useEffect(() => {
+    if (!isMenuOpen) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      setIsMenuOpen(false);
+      lenis?.start();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isMenuOpen, lenis, setIsMenuOpen]);
+
   const goToBottom = () => {
     setIsMenuOpen(false);
 
