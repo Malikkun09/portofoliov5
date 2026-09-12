@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "postbuild": "next-sitemap",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -48,6 +49,7 @@
     "clsx": "^2.0.0",
     "gsap": "^3.12.5",
     "lenis": "^1.1.6",
+    "meshline": "^3.3.1",
     "next": "^14.0.3",
     "next-seo": "^6.5.0",
     "postprocessing": "^6.35.6",
@@ -58,8 +60,7 @@
     "sharp": "^0.33.4",
     "split-type": "^0.3.4",
     "three": "^0.167.0",
-    "zustand": "^4.5.4",
-    "meshline": "^3.3.1"
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@react-three/eslint-plugin": "^0.1.1",
@@ -82,7 +83,8 @@
     "prettier": "^3.2.5",
     "raw-loader": "^4.0.2",
     "sass": "^1.69.4",
-    "stats.js": "^0.17.0"
+    "stats.js": "^0.17.0",
+    "vitest": "^5.0.0"
   },
   "allowScripts": {
     "sharp@0.33.5": true,

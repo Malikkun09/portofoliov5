@@ -65,6 +65,11 @@ const nextConfig = {
       destination: '/',
       permanent: true,
     },
+    {
+      source: '/projects/chat',
+      destination: '/projects/chatbot',
+      permanent: false,
+    },
   ],
 };
 

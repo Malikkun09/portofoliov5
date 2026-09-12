@@ -211,6 +211,8 @@ function Layout({ children, layoutRef, mainRef, router }) {
     [introOut, menuTime, isEntering],
   );
 
+  const isChatbot = router.pathname === '/projects/chatbot';
+
   return (
     <>
       <SwitchTransition>
@@ -229,10 +231,14 @@ function Layout({ children, layoutRef, mainRef, router }) {
         </ReactTransition>
       </SwitchTransition>
 
-      <PreFooter />
-      <footer className={styles.footer}>
-        <Footer />
-      </footer>
+      {isChatbot ? null : (
+        <>
+          <PreFooter />
+          <footer className={styles.footer}>
+            <Footer />
+          </footer>
+        </>
+      )}
     </>
   );
 }

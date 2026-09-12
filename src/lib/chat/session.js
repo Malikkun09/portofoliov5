@@ -42,7 +42,11 @@ export function clearSession() {
 
 export function toApiMessages(messages) {
   return messages
-    .filter((message) => message.role === 'user' || message.role === 'assistant')
+    .filter((message) => {
+      if (message.role === 'user') return true;
+      if (message.role !== 'assistant') return false;
+      return Boolean(String(message.content || '').trim() || String(message.reasoning || '').trim());
+    })
     .map((message) => {
       if (message.role === 'user') {
         const parts = [];

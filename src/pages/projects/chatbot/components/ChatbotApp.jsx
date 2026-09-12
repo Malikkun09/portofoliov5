@@ -1,8 +1,7 @@
-/* eslint-disable react/no-array-index-key */
+/* eslint-disable react/no-array-index-key, no-await-in-loop, no-loop-func, no-constant-condition, jsx-a11y/media-has-caption, @next/next/no-img-element */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import clsx from 'clsx';
-import Link from 'next/link';
 import { deserializeAttachmentsFromStorage, processSelectedFiles, serializeAttachmentsForStorage } from '@src/lib/chat/attachments';
 import { formatExpiryCountdown, getMediaPurgeMinutes, purgeAllMedia, registerMedia, restoreMediaFromSession } from '@src/lib/chat/mediaCache';
 import { clearSession, loadSession, saveSession, toApiMessages } from '@src/lib/chat/session';
@@ -18,6 +17,27 @@ const EMPTY_ASSISTANT = {
   isStreaming: false,
 };
 
+const SUGGESTIONS = [
+  {
+    id: 'photo',
+    label: 'Jelaskan foto',
+    prompt: 'Jelaskan gambar yang saya lampirkan.',
+    attach: true,
+  },
+  {
+    id: 'file',
+    label: 'Ringkas file',
+    prompt: 'Ringkas isi file yang saya lampirkan.',
+    attach: true,
+  },
+  {
+    id: 'ask',
+    label: 'Tanya apa saja',
+    prompt: 'Halo — bantu aku pikirin ide proyek.',
+    attach: false,
+  },
+];
+
 function createUserMessage(text, attachments) {
   return {
     id: `user-${Date.now()}`,
@@ -28,6 +48,31 @@ function createUserMessage(text, attachments) {
   };
 }
 
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={styles.icon}>
+      <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={styles.icon}>
+      <path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={styles.icon}>
+      <path d="M20 12a8 8 0 1 1-2.2-5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M20 5v5h-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function ChatbotApp() {
   const setFluidColor = useStore((state) => state.setFluidColor);
   const [messages, setMessages] = useState([]);
@@ -36,14 +81,17 @@ function ChatbotApp() {
   const [showThinking, setShowThinking] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
   const [provider, setProvider] = useState(null);
   const [mediaExpiryAt, setMediaExpiryAt] = useState(null);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
+  const stageRef = useRef(null);
 
   const purgeMinutes = getMediaPurgeMinutes();
+  const canSend = Boolean(draft.trim() || pendingAttachments.some((attachment) => attachment.kind !== 'error')) && !isStreaming;
 
   useEffect(() => {
     restoreMediaFromSession();
@@ -52,14 +100,14 @@ function ChatbotApp() {
     setShowThinking(session.showThinking ?? true);
 
     gsap.set('html', {
-      '--black': '#141416',
-      '--white': '#f0f4f1',
-      '--accentColor': '#f0f4f1',
+      '--black': '#0e0e0f',
+      '--white': '#ececec',
+      '--accentColor': '#ececec',
       '--fillColor': '#c6ff3d',
-      '--menuColor': '#c6ff3d',
-      '--menuFontColor': '#141416',
+      '--menuColor': '#2f2f31',
+      '--menuFontColor': '#ececec',
     });
-    setFluidColor('#c6ff3d');
+    setFluidColor('#2a2a2c');
 
     return () => {
       purgeAllMedia();
@@ -86,18 +134,50 @@ function ChatbotApp() {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'end',
+    });
   }, [messages, isStreaming]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [draft]);
 
   const expiryCountdown = useMemo(() => {
     if (!mediaExpiryAt) return purgeMinutes;
     return formatExpiryCountdown(mediaExpiryAt);
   }, [mediaExpiryAt, purgeMinutes]);
 
+  const finalizeAssistant = useCallback((hadError) => {
+    setMessages((prev) => {
+      const next = [...prev];
+      const lastIndex = next.length - 1;
+      const last = next[lastIndex];
+      if (!last || last.role !== 'assistant') return prev;
+
+      const empty = !String(last.content || '').trim() && !String(last.reasoning || '').trim();
+      if (hadError && empty) {
+        next.pop();
+        return next;
+      }
+
+      next[lastIndex] = {
+        ...last,
+        isStreaming: false,
+      };
+      return next;
+    });
+  }, []);
+
   const streamChat = useCallback(
     async ({ apiMessages, replaceLastAssistant = false }) => {
       setIsStreaming(true);
       setError('');
+      setStatus('');
       setProvider(null);
 
       setMessages((prev) => {
@@ -115,6 +195,8 @@ function ChatbotApp() {
 
         return [...prev, assistantMessage];
       });
+
+      let sawError = false;
 
       try {
         const response = await fetch('/api/chat/completions', {
@@ -156,14 +238,17 @@ function ChatbotApp() {
 
               if (event.type === 'meta') {
                 setProvider(event.provider);
+                setStatus('');
               }
 
               if (event.type === 'fallback') {
-                setError(event.message);
+                setStatus(event.message);
               }
 
               if (event.type === 'error') {
+                sawError = true;
                 setError(event.message);
+                setStatus('');
               }
 
               if (event.type === 'reasoning' || event.type === 'content') {
@@ -177,6 +262,7 @@ function ChatbotApp() {
                     ...current,
                     reasoning: event.type === 'reasoning' ? `${current.reasoning || ''}${event.text || ''}` : current.reasoning,
                     content: event.type === 'content' ? `${current.content || ''}${event.text || ''}` : current.content,
+                    provider: current.provider,
                   };
                   return next;
                 });
@@ -187,23 +273,14 @@ function ChatbotApp() {
           });
         }
       } catch (streamError) {
-        setError(streamError.message || 'Streaming failed. Please try again.');
+        sawError = true;
+        setError(streamError.message || 'Streaming gagal. Coba lagi. / Streaming failed.');
       } finally {
         setIsStreaming(false);
-        setMessages((prev) => {
-          const next = [...prev];
-          const lastIndex = next.length - 1;
-          if (next[lastIndex]?.role === 'assistant') {
-            next[lastIndex] = {
-              ...next[lastIndex],
-              isStreaming: false,
-            };
-          }
-          return next;
-        });
+        finalizeAssistant(sawError);
       }
     },
-    [showThinking],
+    [finalizeAssistant, showThinking],
   );
 
   const handleSend = async () => {
@@ -240,7 +317,7 @@ function ChatbotApp() {
   };
 
   const handleRegenerate = async () => {
-    if (isStreaming || messages.length < 2) return;
+    if (isStreaming || messages.length === 0) return;
 
     const withoutLastAssistant = messages[messages.length - 1]?.role === 'assistant' ? messages.slice(0, -1) : messages;
     if (withoutLastAssistant.length === 0) return;
@@ -271,157 +348,176 @@ function ChatbotApp() {
     setDraft('');
     setPendingAttachments([]);
     setError('');
+    setStatus('');
     setProvider(null);
     setMediaExpiryAt(null);
+    textareaRef.current?.focus();
+  };
+
+  const handleSuggestion = (suggestion) => {
+    setDraft(suggestion.prompt);
+    textareaRef.current?.focus();
+    if (suggestion.attach) {
+      fileInputRef.current?.click();
+    }
   };
 
   const lastAssistant = messages[messages.length - 1]?.role === 'assistant' ? messages[messages.length - 1] : null;
+  const isEmpty = messages.length === 0;
 
   return (
-    <div className={clsx(styles.root, 'layout-block-inner')}>
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>Portfolio Project</p>
-          <h1 className={clsx(styles.title, 'h2')}>Multimodal Chatbot</h1>
-          <p className={styles.subtitle}>
-            Text, image, video, and document chat with session memory. No login required — conversation stays in this tab until you leave.
-          </p>
-        </div>
-        <div className={styles.headerActions}>
-          <Link href="/projects" className={styles.backLink}>← All projects</Link>
-          <button type="button" className={styles.ghostButton} onClick={handleClearSession} disabled={isStreaming}>
-            Clear chat
+    <div className={styles.root}>
+      <div className={styles.topBar}>
+        <p className={styles.modelHint}>{provider ? `via ${provider}` : 'Chat'}</p>
+        <div className={styles.topActions}>
+          <button type="button" className={styles.iconButton} onClick={() => setShowThinking((value) => !value)} aria-pressed={showThinking} title="Show or hide model thinking">
+            {showThinking ? 'Thinking on' : 'Thinking off'}
+          </button>
+          <button type="button" className={styles.roundButton} onClick={handleClearSession} disabled={isStreaming} aria-label="New chat">
+            <RefreshIcon />
           </button>
         </div>
-      </header>
-
-      <div className={styles.notice} role="note">
-        <strong>Privacy:</strong> uploads (images, videos, files) are kept only in this browser session and auto-purged after{' '}
-        <strong>{purgeMinutes} minutes</strong>
-        {mediaExpiryAt ? ` (next purge in ~${expiryCountdown} min)` : ''} or when you close the tab.
       </div>
 
-      <div className={styles.toolbar}>
-        <label className={styles.toggle}>
-          <input type="checkbox" checked={showThinking} onChange={(event) => setShowThinking(event.target.checked)} />
-          <span>Show model thinking</span>
-        </label>
-        {provider ? <span className={styles.providerBadge}>via {provider}</span> : null}
-      </div>
-
-      <section className={styles.chatPanel} aria-live="polite">
-        {messages.length === 0 ? (
+      <section ref={stageRef} className={clsx(styles.stage, isEmpty && styles.stageEmpty)} aria-live="polite" data-lenis-prevent>
+        {isEmpty ? (
           <div className={styles.emptyState}>
-            <p>Ask anything — attach a screenshot, MP4 clip, or text file.</p>
-            <p className={styles.emptyHint}>Reasoning traces can be toggled. Regenerate if the answer misses the mark.</p>
+            <h1 className={styles.emptyTitle}>Ada yang bisa dibantu?</h1>
+            <p className={styles.emptyHint}>Ask anything — text, images, video, or files. No login.</p>
           </div>
-        ) : null}
-
-        {messages.map((message, index) => {
-          if (message.role === 'user') {
-            const storedAttachments = deserializeAttachmentsFromStorage(message.attachments);
-            return (
-              <article key={message.id || index} className={clsx(styles.message, styles.userMessage)}>
-                <p className={styles.messageRole}>You</p>
-                {message.text ? <p className={styles.messageText}>{message.text}</p> : null}
-                {storedAttachments.length > 0 ? (
-                  <div className={styles.attachmentGrid}>
-                    {storedAttachments.map((attachment) => (
-                      <div key={attachment.id} className={styles.attachmentCard}>
-                        {attachment.kind === 'image' && attachment.dataUrl ? (
-                          <img src={attachment.dataUrl} alt={attachment.name} className={styles.attachmentPreview} />
-                        ) : null}
-                        {attachment.kind === 'video' && attachment.dataUrl ? (
-                          <video src={attachment.dataUrl} controls className={styles.attachmentPreview} />
-                        ) : null}
-                        <span>{attachment.name}</span>
+        ) : (
+          <div className={styles.thread}>
+            {messages.map((message, index) => {
+              if (message.role === 'user') {
+                const storedAttachments = deserializeAttachmentsFromStorage(message.attachments);
+                return (
+                  <article key={message.id || index} className={clsx(styles.message, styles.userMessage)}>
+                    {message.text ? <p className={styles.messageText}>{message.text}</p> : null}
+                    {storedAttachments.length > 0 ? (
+                      <div className={styles.attachmentGrid}>
+                        {storedAttachments.map((attachment) => (
+                          <div key={attachment.id} className={styles.attachmentCard}>
+                            {attachment.kind === 'image' && attachment.dataUrl ? <img src={attachment.dataUrl} alt={attachment.name} className={styles.attachmentPreview} /> : null}
+                            {attachment.kind === 'video' && attachment.dataUrl ? <video src={attachment.dataUrl} controls className={styles.attachmentPreview} /> : null}
+                            <span>{attachment.name}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ) : null}
-              </article>
-            );
-          }
+                    ) : null}
+                  </article>
+                );
+              }
 
-          return (
-            <article key={message.id || index} className={clsx(styles.message, styles.assistantMessage)}>
-              <div className={styles.assistantHeader}>
-                <p className={styles.messageRole}>Assistant</p>
-                {index === messages.length - 1 && !message.isStreaming ? (
-                  <button type="button" className={styles.regenerateButton} onClick={handleRegenerate} disabled={isStreaming}>
-                    ↻ Regenerate
-                  </button>
-                ) : null}
-              </div>
+              return (
+                <article key={message.id || index} className={clsx(styles.message, styles.assistantMessage)}>
+                  {showThinking && message.reasoning ? (
+                    <details className={styles.thinkingBlock} open={message.isStreaming}>
+                      <summary>Thinking</summary>
+                      <pre>{message.reasoning}</pre>
+                    </details>
+                  ) : null}
 
-              {showThinking && message.reasoning ? (
-                <details className={styles.thinkingBlock} open={message.isStreaming}>
-                  <summary>Thinking</summary>
-                  <pre>{message.reasoning}</pre>
-                </details>
-              ) : null}
+                  <div className={styles.messageText}>{message.content || (message.isStreaming ? '…' : '')}</div>
 
-              <div className={styles.messageText}>{message.content || (message.isStreaming ? '…' : '')}</div>
-            </article>
-          );
-        })}
-        <div ref={messagesEndRef} />
+                  {index === messages.length - 1 && !message.isStreaming && message.content ? (
+                    <button type="button" className={styles.regenerateButton} onClick={handleRegenerate} disabled={isStreaming}>
+                      Regenerate
+                    </button>
+                  ) : null}
+                </article>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
       </section>
 
-      {error ? <p className={styles.errorBanner}>{error}</p> : null}
+      <div className={styles.dock}>
+        <div className={styles.dockInner}>
+          {error ? (
+            <p className={styles.errorBanner} role="alert">
+              {error}
+            </p>
+          ) : null}
+          {status && !error ? <p className={styles.statusNote}>{status}</p> : null}
 
-      {pendingAttachments.length > 0 ? (
-        <div className={styles.pendingAttachments}>
-          {pendingAttachments.map((attachment) => (
-            <div key={attachment.id} className={styles.pendingChip}>
-              <span>{attachment.name}</span>
-              {attachment.error ? <em>{attachment.error}</em> : null}
-              <button type="button" aria-label={`Remove ${attachment.name}`} onClick={() => removePendingAttachment(attachment.id)}>
-                ×
-              </button>
+          {isEmpty ? (
+            <div className={styles.suggestions}>
+              {SUGGESTIONS.map((suggestion) => (
+                <button key={suggestion.id} type="button" className={styles.suggestion} onClick={() => handleSuggestion(suggestion)} disabled={isStreaming}>
+                  {suggestion.label}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-      ) : null}
+          ) : null}
 
-      <footer className={styles.composer}>
-        <button type="button" className={styles.attachButton} onClick={() => fileInputRef.current?.click()} disabled={isStreaming}>
-          Attach
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*,video/mp4,audio/*,.txt,.md,.json,.csv"
-          className={styles.hiddenInput}
-          onChange={handleFileSelect}
-        />
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
+          {pendingAttachments.length > 0 ? (
+            <div className={styles.pendingAttachments}>
+              {pendingAttachments.map((attachment) => (
+                <div key={attachment.id} className={styles.pendingChip}>
+                  <span>{attachment.name}</span>
+                  {attachment.error ? <em>{attachment.error}</em> : null}
+                  <button type="button" aria-label={`Remove ${attachment.name}`} onClick={() => removePendingAttachment(attachment.id)}>
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <form
+            className={styles.composer}
+            onSubmit={(event) => {
               event.preventDefault();
               handleSend();
-            }
-          }}
-          placeholder="Type a message… (Shift+Enter for newline)"
-          rows={2}
-          disabled={isStreaming}
-        />
-        <button type="button" className={styles.sendButton} onClick={handleSend} disabled={isStreaming}>
-          {isStreaming ? 'Streaming…' : 'Send'}
-        </button>
-      </footer>
+            }}
+          >
+            <button type="button" className={styles.plusButton} onClick={() => fileInputRef.current?.click()} disabled={isStreaming} aria-label="Attach file">
+              <PlusIcon />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,video/mp4,audio/*,.txt,.md,.json,.csv"
+              className={styles.hiddenInput}
+              onChange={handleFileSelect}
+              aria-label="Attach image, video, or file"
+            />
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Tanya apa saja..."
+              rows={1}
+              disabled={isStreaming}
+              aria-label="Message"
+            />
+            <button type="submit" className={clsx(styles.sendButton, canSend && styles.sendReady)} disabled={!canSend} aria-label={isStreaming ? 'Streaming' : 'Send'}>
+              {isStreaming ? <span className={styles.pulse} /> : <SendIcon />}
+            </button>
+          </form>
 
-      {lastAssistant && !lastAssistant.isStreaming ? (
-        <div className={styles.regenerateFooter}>
-          <button type="button" onClick={handleRegenerate} disabled={isStreaming}>
-            Not satisfied? Regenerate last answer
-          </button>
+          <p className={styles.caption}>
+            Media auto-hapus {purgeMinutes} menit
+            {mediaExpiryAt ? ` · ~${expiryCountdown} min left` : ''} · session only
+            {lastAssistant && !lastAssistant.isStreaming ? (
+              <>
+                {' · '}
+                <button type="button" className={styles.inlineAction} onClick={handleRegenerate} disabled={isStreaming}>
+                  Regenerate last answer
+                </button>
+              </>
+            ) : null}
+          </p>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
