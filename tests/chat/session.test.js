@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { buildApiPayload } from '@src/lib/chat/payloadBudget';
 import { toApiMessages } from '../../src/lib/chat/session';
 import { sanitizeAssistantMessage } from '../../src/lib/chat/thinking';
 
 describe('toApiMessages', () => {
-  it('sends the full conversation history, skipping empty assistant placeholders', () => {
+  it('sends conversation history while skipping empty assistant placeholders', () => {
     const apiMessages = toApiMessages([
       { role: 'user', text: 'Halo' },
       { role: 'assistant', content: 'Hai, ada yang bisa dibantu?' },
@@ -30,5 +31,25 @@ describe('toApiMessages', () => {
       { role: 'user', content: [{ type: 'text', text: 'Foto?' }] },
       { role: 'assistant', content: 'Ini foto Zoom.' },
     ]);
+  });
+
+  it('does not re-send old image blobs on later turns', () => {
+    const image = 'data:image/jpeg;base64,abc';
+    const payload = buildApiPayload([
+      {
+        role: 'user',
+        text: 'First',
+        attachments: [{ kind: 'image', dataUrl: image, name: 'a.jpg' }],
+      },
+      { role: 'assistant', content: 'Seen it.' },
+      {
+        role: 'user',
+        text: 'Again',
+        attachments: [{ kind: 'image', dataUrl: image, name: 'b.jpg' }],
+      },
+    ]);
+
+    expect(payload.messages[0].content.some((part) => part.type === 'image_url')).toBe(false);
+    expect(payload.messages[2].content.some((part) => part.type === 'image_url')).toBe(true);
   });
 });

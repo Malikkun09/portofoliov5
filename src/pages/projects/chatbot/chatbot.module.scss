@@ -192,8 +192,162 @@
 
 .messageText {
   margin: 0;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.userBubble .messageText {
+  white-space: pre-wrap;
+}
+
+.markdown {
+  font-size: inherit;
+  line-height: 1.55;
+  color: inherit;
+
+  > :first-child {
+    margin-top: 0;
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+}
+
+.mdParagraph {
+  margin: 0.45rem 0;
+}
+
+.mdHeading,
+.mdHeadingThinking {
+  margin: 0.85rem 0 0.4rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.mdHeading {
+  font-size: 1.05rem;
+}
+
+.mdHeadingThinking {
+  font-size: 0.92rem;
+}
+
+.mdSubheading {
+  margin: 0.65rem 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.mdList,
+.mdOrderedList {
+  margin: 0.45rem 0;
+  padding-left: 1.25rem;
+}
+
+.mdListItem {
+  margin: 0.2rem 0;
+}
+
+.mdListItem > .mdParagraph {
+  margin: 0.15rem 0;
+}
+
+.mdBlockquote {
+  margin: 0.55rem 0;
+  padding-left: 0.75rem;
+  border-left: 2px solid rgba(198, 255, 61, 0.28);
+  color: rgba(236, 236, 236, 0.78);
+}
+
+.mdHr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 0.75rem 0;
+}
+
+.mdStrong {
+  font-weight: 650;
+}
+
+.mdEm {
+  font-style: italic;
+}
+
+.mdDel {
+  opacity: 0.72;
+}
+
+.mdInlineCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.88em;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0.35rem;
+  padding: 0.08rem 0.35rem;
+}
+
+.mdPre {
+  margin: 0.55rem 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  background: rgba(0, 0, 0, 0.35);
+  overflow-x: auto;
+  max-width: 100%;
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-size: 0.82rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+.mdLink {
+  color: rgba(198, 255, 61, 0.88);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.mdUnsafeLink {
+  color: inherit;
+}
+
+.mdTableWrap {
+  margin: 0.55rem 0;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.mdTable {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.mdTableHead {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mdTableRow {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mdTableCell {
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+
+  &:last-child {
+    border-right: none;
+  }
+}
+
+.mdTaskCheckbox {
+  margin-right: 0.35rem;
+  vertical-align: middle;
 }
 
 .thinkingBlock {
@@ -214,13 +368,8 @@
     display: none;
   }
 
-  pre {
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-family: inherit;
+  .markdown {
     font-size: 0.85rem;
-    user-select: text;
   }
 }
 
