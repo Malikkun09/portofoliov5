@@ -1,5 +1,33 @@
 const projects = [
   {
+    id: 'chatbot',
+    title: 'Multimodal Chatbot',
+    img: '/project7/project7.webp',
+    link: '/projects/chatbot',
+    date: '2026',
+    liveLink: '/projects/chatbot',
+    company: 'Personal',
+    primary: '#141416',
+    accentColor: '#f0f4f1',
+    secondary: '#f0f4f1',
+    fillColor: '#C6FF3D',
+    menuColor: '#C6FF3D',
+    menuFontColor: '#141416',
+    fluidColor: '#C6FF3D',
+    images: [
+      {
+        src: '/project7/1.webp',
+        tag: 'big',
+        isRight: false,
+      },
+    ],
+    desc: [
+      'An interactive multimodal chatbot built into this portfolio: text, images, MP4 video, and documents with streaming AI responses.',
+      'Powered by NVIDIA Nemotron Omni with OpenRouter free fallback. Session memory stays in your browser — no login, with a 30-minute media purge.',
+      'Toggle model thinking traces, regenerate answers, and keep chatting in one focused full-page experience.',
+    ],
+  },
+  {
     id: 'project6',
     title: 'YOLO-World',
     img: '/project6/project6.webp',

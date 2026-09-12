@@ -104,7 +104,9 @@ function Page({ id }) {
 }
 
 export async function getStaticPaths() {
-  const paths = projects.map((project) => ({ params: { id: project.id } }));
+  const paths = projects
+    .filter((project) => project.id !== 'chatbot')
+    .map((project) => ({ params: { id: project.id } }));
   return { paths, fallback: false };
 }
 
