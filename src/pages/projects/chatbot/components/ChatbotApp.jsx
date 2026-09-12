@@ -3,6 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import clsx from 'clsx';
 import { deserializeAttachmentsFromStorage, processSelectedFiles, serializeAttachmentsForStorage } from '@src/lib/chat/attachments';
+import {
+  formatChatHttpError,
+  formatChatNetworkError,
+  formatChatStreamDisconnectError,
+  readChatHttpErrorMessage,
+} from '@src/lib/chat/clientErrors';
 import { formatExpiryCountdown, getMediaPurgeMinutes, purgeAllMedia, registerMedia, restoreMediaFromSession } from '@src/lib/chat/mediaCache';
 import { clearSession, loadSession, saveSession, toApiMessages } from '@src/lib/chat/session';
 import { sanitizeAssistantMessage } from '@src/lib/chat/thinking';
@@ -17,6 +23,8 @@ const EMPTY_ASSISTANT = {
   provider: null,
   isStreaming: false,
 };
+
+const NEAR_BOTTOM_PX = 120;
 
 const SUGGESTIONS = [
   {
@@ -86,13 +94,31 @@ function ChatbotApp() {
   const [provider, setProvider] = useState(null);
   const [mediaExpiryAt, setMediaExpiryAt] = useState(null);
 
-  const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const stageRef = useRef(null);
+  const shouldAutoScrollRef = useRef(true);
 
   const purgeMinutes = getMediaPurgeMinutes();
   const canSend = Boolean(draft.trim() || pendingAttachments.some((attachment) => attachment.kind !== 'error')) && !isStreaming;
+
+  const isNearBottom = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return true;
+    return stage.scrollHeight - stage.scrollTop - stage.clientHeight <= NEAR_BOTTOM_PX;
+  }, []);
+
+  const scrollTranscriptToBottom = useCallback((behavior = 'auto') => {
+    const stage = stageRef.current;
+    if (!stage || !shouldAutoScrollRef.current) return;
+
+    if (behavior === 'smooth') {
+      stage.scrollTo({ top: stage.scrollHeight, behavior: 'smooth' });
+      return;
+    }
+
+    stage.scrollTop = stage.scrollHeight;
+  }, []);
 
   useEffect(() => {
     restoreMediaFromSession();
@@ -138,11 +164,20 @@ function ChatbotApp() {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'end',
-    });
-  }, [messages, isStreaming]);
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+
+    const handleScroll = () => {
+      shouldAutoScrollRef.current = isNearBottom();
+    };
+
+    stage.addEventListener('scroll', handleScroll, { passive: true });
+    return () => stage.removeEventListener('scroll', handleScroll);
+  }, [isNearBottom]);
+
+  useEffect(() => {
+    scrollTranscriptToBottom(isStreaming ? 'auto' : 'smooth');
+  }, [messages, isStreaming, scrollTranscriptToBottom]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -201,6 +236,7 @@ function ChatbotApp() {
       });
 
       let sawError = false;
+      let receivedStreamData = false;
 
       try {
         const response = await fetch('/api/chat/completions', {
@@ -212,9 +248,16 @@ function ChatbotApp() {
           }),
         });
 
-        if (!response.ok || !response.body) {
+        if (!response.ok) {
           sawError = true;
-          setError(response.status === 405 ? 'Metode tidak diizinkan. / Method not allowed.' : 'Tidak bisa terhubung ke server chat. Coba lagi. / Could not reach the chat server.');
+          const serverMessage = await readChatHttpErrorMessage(response);
+          setError(formatChatHttpError(response.status, serverMessage));
+          return;
+        }
+
+        if (!response.body) {
+          sawError = true;
+          setError(formatChatHttpError(response.status, 'No response body'));
           return;
         }
 
@@ -226,6 +269,7 @@ function ChatbotApp() {
           const { done, value } = await reader.read();
           if (done) break;
 
+          receivedStreamData = true;
           buffer += decoder.decode(value, { stream: true });
           const chunks = buffer.split('\n\n');
           buffer = chunks.pop() || '';
@@ -243,11 +287,13 @@ function ChatbotApp() {
               const event = JSON.parse(line);
 
               if (event.type === 'meta') {
+                receivedStreamData = true;
                 setProvider(event.provider);
                 setStatus('');
               }
 
               if (event.type === 'fallback') {
+                receivedStreamData = true;
                 setStatus(event.message);
               }
 
@@ -258,6 +304,7 @@ function ChatbotApp() {
               }
 
               if (event.type === 'reasoning' || event.type === 'content') {
+                receivedStreamData = true;
                 setMessages((prev) => {
                   const next = [...prev];
                   const lastIndex = next.length - 1;
@@ -285,8 +332,11 @@ function ChatbotApp() {
         }
       } catch (streamError) {
         sawError = true;
-        const isAbort = streamError?.name === 'AbortError';
-        setError(isAbort ? 'Waktu habis. Coba lagi. / Request timed out.' : 'Tidak bisa terhubung ke server chat. Coba lagi. / Could not reach the chat server.');
+        setError((current) => {
+          if (current) return current;
+          if (receivedStreamData) return formatChatStreamDisconnectError();
+          return formatChatNetworkError(streamError);
+        });
       } finally {
         setIsStreaming(false);
         finalizeAssistant(sawError);
@@ -320,6 +370,7 @@ function ChatbotApp() {
     const userMessage = createUserMessage(trimmed, registeredAttachments);
     const nextMessages = [...messages, userMessage];
 
+    shouldAutoScrollRef.current = true;
     setMessages(nextMessages);
     setDraft('');
     setPendingAttachments([]);
@@ -334,6 +385,7 @@ function ChatbotApp() {
     const withoutLastAssistant = messages[messages.length - 1]?.role === 'assistant' ? messages.slice(0, -1) : messages;
     if (withoutLastAssistant.length === 0) return;
 
+    shouldAutoScrollRef.current = true;
     const apiMessages = toApiMessages(withoutLastAssistant);
     await streamChat({ apiMessages, replaceLastAssistant: true });
   };
@@ -455,7 +507,6 @@ function ChatbotApp() {
                 </div>
               );
             })}
-            <div ref={messagesEndRef} />
           </div>
         )}
       </div>

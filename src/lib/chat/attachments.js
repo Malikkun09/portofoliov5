@@ -1,3 +1,5 @@
+import { compressImageFile } from '@src/lib/chat/imageCompress';
+
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']);
 const VIDEO_TYPES = new Set(['video/mp4']);
 const AUDIO_TYPES = new Set(['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/flac', 'audio/x-flac']);
@@ -50,7 +52,7 @@ export async function processSelectedFiles(files) {
     const objectUrl = typeof URL !== 'undefined' ? URL.createObjectURL(file) : null;
 
     if (IMAGE_TYPES.has(mimeType)) {
-      const dataUrl = await readFileAsDataUrl(file);
+      const dataUrl = await compressImageFile(file);
       attachments.push({
         id,
         name: file.name,
