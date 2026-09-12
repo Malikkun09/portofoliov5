@@ -179,4 +179,25 @@ describe('runChatCompletions', () => {
     expect(events.filter((event) => event.type === 'done')).toHaveLength(0);
     expect(events.some((event) => event.type === 'error')).toBe(true);
   });
+
+  it('strips leaked thinking tags from streamed NVIDIA content', async () => {
+    const events = [];
+    const fetchImpl = vi.fn(async () => streamResponse('{thinking}Halo dari zoom.'));
+
+    const result = await runChatCompletions({
+      messages: [{ role: 'user', content: 'hi' }],
+      env: { NVIDIA_API_KEY: 'nvapi-test' },
+      fetchImpl,
+      onEvent: (event) => events.push(event),
+      sleepFn: async () => {},
+    });
+
+    expect(result.ok).toBe(true);
+    const content = events
+      .filter((event) => event.type === 'content')
+      .map((event) => event.text)
+      .join('');
+    expect(content).toBe('Halo dari zoom.');
+    expect(JSON.stringify(events)).not.toMatch(/\{thinking\}/);
+  });
 });

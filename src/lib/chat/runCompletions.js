@@ -2,6 +2,7 @@ import { resolveOpenRouterModels } from '@src/lib/chat/fallbackModels';
 import { NVIDIA_KEY_NAMES, OPENROUTER_KEY_NAMES, readApiKey } from '@src/lib/chat/keys';
 import { classifyProviderFailure, composeFinalError } from '@src/lib/chat/providerErrors';
 import { retryOnce } from '@src/lib/chat/retry';
+import { createThinkingSplitter } from '@src/lib/chat/thinking';
 
 export const NVIDIA_ENDPOINT = 'https://integrate.api.nvidia.com/v1/chat/completions';
 export const NVIDIA_MODEL = 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning';
@@ -105,6 +106,7 @@ async function pipeProviderStream({ response, onEvent, provider }) {
   let streamError = null;
 
   onEvent({ type: 'meta', provider });
+  const thinkingSplitter = createThinkingSplitter();
 
   const consumeLine = (line) => {
     const trimmed = line.trim();
@@ -123,13 +125,17 @@ async function pipeProviderStream({ response, onEvent, provider }) {
 
       const { reasoning, content, finishReason } = extractDeltaFields(parsed);
 
-      if (reasoning) {
-        hasOutput = true;
-        onEvent({ type: 'reasoning', text: reasoning });
-      }
-      if (content) {
-        hasOutput = true;
-        onEvent({ type: 'content', text: content });
+      if (reasoning || content) {
+        const events = thinkingSplitter.ingest({
+          reasoning: reasoning || '',
+          content: content || '',
+        });
+        if (events.length > 0) {
+          hasOutput = true;
+          events.forEach((event) => onEvent(event));
+        } else if (reasoning || content) {
+          hasOutput = true;
+        }
       }
       if (finishReason) {
         onEvent({ type: 'finish', reason: finishReason });

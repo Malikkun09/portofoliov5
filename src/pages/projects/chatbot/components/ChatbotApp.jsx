@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { deserializeAttachmentsFromStorage, processSelectedFiles, serializeAttachmentsForStorage } from '@src/lib/chat/attachments';
 import { formatExpiryCountdown, getMediaPurgeMinutes, purgeAllMedia, registerMedia, restoreMediaFromSession } from '@src/lib/chat/mediaCache';
 import { clearSession, loadSession, saveSession, toApiMessages } from '@src/lib/chat/session';
+import { sanitizeAssistantMessage } from '@src/lib/chat/thinking';
 import styles from '@src/pages/projects/chatbot/chatbot.module.scss';
 import { gsap } from 'gsap';
 import { useStore } from '@src/store';
@@ -99,6 +100,8 @@ function ChatbotApp() {
     setMessages(session.messages || []);
     setShowThinking(session.showThinking ?? true);
 
+    document.documentElement.dataset.chat = '1';
+
     gsap.set('html', {
       '--black': '#141416',
       '--white': '#f0f4f1',
@@ -110,6 +113,7 @@ function ChatbotApp() {
     setFluidColor('#d7d7d4');
 
     return () => {
+      delete document.documentElement.dataset.chat;
       purgeAllMedia();
       gsap.set('html', {
         '--black': '#28282b',
@@ -165,10 +169,10 @@ function ChatbotApp() {
         return next;
       }
 
-      next[lastIndex] = {
+      next[lastIndex] = sanitizeAssistantMessage({
         ...last,
         isStreaming: false,
-      };
+      });
       return next;
     });
   }, []);
@@ -260,11 +264,16 @@ function ChatbotApp() {
                   const current = next[lastIndex];
                   if (!current || current.role !== 'assistant') return prev;
 
-                  next[lastIndex] = {
+                  const field = event.type === 'reasoning' ? 'reasoning' : 'content';
+                  const nextValue = event.replace ? event.text || '' : `${current[field] || ''}${event.text || ''}`;
+                  const sanitized = sanitizeAssistantMessage({
                     ...current,
-                    reasoning: event.type === 'reasoning' ? `${current.reasoning || ''}${event.text || ''}` : current.reasoning,
-                    content: event.type === 'content' ? `${current.content || ''}${event.text || ''}` : current.content,
-                    provider: current.provider,
+                    [field]: nextValue,
+                  });
+
+                  next[lastIndex] = {
+                    ...sanitized,
+                    isStreaming: true,
                   };
                   return next;
                 });
@@ -364,22 +373,35 @@ function ChatbotApp() {
     }
   };
 
-  const lastAssistant = messages[messages.length - 1]?.role === 'assistant' ? messages[messages.length - 1] : null;
   const isEmpty = messages.length === 0;
 
   return (
     <div className={styles.root}>
-      <div className={styles.topBar}>
-        <p className={styles.modelHint}>{provider ? `via ${provider}` : 'Chat'}</p>
-        <button type="button" className={styles.roundButton} onClick={handleClearSession} disabled={isStreaming} aria-label="New chat">
-          <RefreshIcon />
-        </button>
-      </div>
+      <header className={styles.topBar}>
+        <div className={styles.topIdentity}>
+          <h1 className={styles.title}>Chat</h1>
+          <p className={styles.modelHint}>{provider ? `via ${provider}` : 'NVIDIA / OpenRouter'}</p>
+        </div>
+        <div className={styles.topActions}>
+          <button
+            type="button"
+            className={styles.iconButton}
+            onClick={() => setShowThinking((value) => !value)}
+            aria-pressed={showThinking}
+            title="Show or hide model thinking"
+          >
+            {showThinking ? 'Thinking on' : 'Thinking off'}
+          </button>
+          <button type="button" className={styles.roundButton} onClick={handleClearSession} disabled={isStreaming} aria-label="New chat">
+            <RefreshIcon />
+          </button>
+        </div>
+      </header>
 
       <div ref={stageRef} className={clsx(styles.stage, isEmpty && styles.stageEmpty)} aria-live="polite" data-lenis-prevent>
         {isEmpty ? (
           <div className={styles.emptyState}>
-            <h1 className={styles.emptyTitle}>Ada yang bisa dibantu?</h1>
+            <h2 className={styles.emptyTitle}>Ada yang bisa dibantu?</h2>
             <p className={styles.emptyHint}>Ask anything — text, images, video, or files. No login.</p>
           </div>
         ) : (
@@ -388,40 +410,49 @@ function ChatbotApp() {
               if (message.role === 'user') {
                 const storedAttachments = deserializeAttachmentsFromStorage(message.attachments);
                 return (
-                  <article key={message.id || index} className={clsx(styles.message, styles.userMessage)}>
-                    {message.text ? <p className={styles.messageText}>{message.text}</p> : null}
-                    {storedAttachments.length > 0 ? (
-                      <div className={styles.attachmentGrid}>
-                        {storedAttachments.map((attachment) => (
-                          <div key={attachment.id} className={styles.attachmentCard}>
-                            {attachment.kind === 'image' && attachment.dataUrl ? <img src={attachment.dataUrl} alt={attachment.name} className={styles.attachmentPreview} /> : null}
-                            {attachment.kind === 'video' && attachment.dataUrl ? <video src={attachment.dataUrl} controls className={styles.attachmentPreview} /> : null}
-                            <span>{attachment.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </article>
+                  <div key={message.id || index} className={styles.rowUser}>
+                    <article className={styles.userBubble}>
+                      {message.text ? <p className={styles.messageText}>{message.text}</p> : null}
+                      {storedAttachments.length > 0 ? (
+                        <div className={styles.attachmentGrid}>
+                          {storedAttachments.map((attachment) => (
+                            <div key={attachment.id} className={styles.attachmentCard}>
+                              {attachment.kind === 'image' && attachment.dataUrl ? <img src={attachment.dataUrl} alt={attachment.name} className={styles.attachmentPreview} /> : null}
+                              {attachment.kind === 'video' && attachment.dataUrl ? <video src={attachment.dataUrl} controls className={styles.attachmentPreview} /> : null}
+                              <span>{attachment.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </article>
+                  </div>
                 );
               }
 
+              const display = sanitizeAssistantMessage(message);
+              const visibleContent = String(display.content || '');
+              const reasoning = String(display.reasoning || '');
+              const hasAnswer = Boolean(visibleContent.trim());
+
               return (
-                <article key={message.id || index} className={clsx(styles.message, styles.assistantMessage)}>
-                  {showThinking && message.reasoning ? (
-                    <details className={styles.thinkingBlock} open={message.isStreaming}>
-                      <summary>Thinking</summary>
-                      <pre>{message.reasoning}</pre>
-                    </details>
-                  ) : null}
+                <div key={message.id || index} className={styles.rowAssistant}>
+                  <article className={styles.assistantBubble}>
+                    {showThinking && reasoning ? (
+                      <details className={styles.thinkingBlock}>
+                        <summary>{message.isStreaming && !hasAnswer ? 'Thinking…' : 'Show model thinking'}</summary>
+                        <pre>{reasoning}</pre>
+                      </details>
+                    ) : null}
 
-                  <div className={styles.messageText}>{message.content || (message.isStreaming ? '…' : '')}</div>
+                    <div className={styles.messageText}>{hasAnswer ? visibleContent : message.isStreaming ? '…' : ''}</div>
+                  </article>
 
-                  {index === messages.length - 1 && !message.isStreaming && message.content ? (
+                  {index === messages.length - 1 && !message.isStreaming && hasAnswer ? (
                     <button type="button" className={styles.regenerateButton} onClick={handleRegenerate} disabled={isStreaming}>
                       Regenerate
                     </button>
                   ) : null}
-                </article>
+                </div>
               );
             })}
             <div ref={messagesEndRef} />
@@ -502,20 +533,8 @@ function ChatbotApp() {
           </form>
 
           <p className={styles.caption}>
-            <button type="button" className={styles.inlineAction} onClick={() => setShowThinking((value) => !value)} aria-pressed={showThinking} title="Show or hide model thinking">
-              {showThinking ? 'Thinking on' : 'Thinking off'}
-            </button>
-            {' · '}
             Media auto-hapus {purgeMinutes} menit
             {mediaExpiryAt ? ` · ~${expiryCountdown} min left` : ''} · session only
-            {lastAssistant && !lastAssistant.isStreaming ? (
-              <>
-                {' · '}
-                <button type="button" className={styles.inlineAction} onClick={handleRegenerate} disabled={isStreaming}>
-                  Regenerate last answer
-                </button>
-              </>
-            ) : null}
           </p>
         </div>
       </div>

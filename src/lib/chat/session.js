@@ -1,3 +1,5 @@
+import { sanitizeAssistantMessage } from '@src/lib/chat/thinking';
+
 const SESSION_KEY = 'chatbot-session-v1';
 
 const defaultSession = () => ({
@@ -16,7 +18,9 @@ export function loadSession() {
     return {
       ...defaultSession(),
       ...parsed,
-      messages: Array.isArray(parsed.messages) ? parsed.messages : [],
+      messages: Array.isArray(parsed.messages)
+        ? parsed.messages.map((message) => (message?.role === 'assistant' ? sanitizeAssistantMessage(message) : message))
+        : [],
     };
   } catch {
     return defaultSession();

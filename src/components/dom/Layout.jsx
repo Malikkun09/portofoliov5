@@ -211,7 +211,7 @@ function Layout({ children, layoutRef, mainRef, router }) {
     [introOut, menuTime, isEntering],
   );
 
-  const isChatbot = router.pathname === '/projects/chatbot';
+  const isChatbot = router.pathname === '/projects/chatbot' || router.pathname === '/projects/chat';
 
   return (
     <>
