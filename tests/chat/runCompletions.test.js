@@ -129,4 +129,54 @@ describe('runChatCompletions', () => {
 
     expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe('Bearer nvapi-clean');
   });
+
+  it('does not retry or fall back after NVIDIA already streamed tokens', async () => {
+    const events = [];
+    let nvidiaCalls = 0;
+    const contentChunk = `data: ${JSON.stringify({ choices: [{ delta: { content: 'Halo' } }] })}\n\n`;
+    const errorChunk = `data: ${JSON.stringify({ error: { message: 'ResourceExhausted' } })}\n\n`;
+    const encoded = new TextEncoder().encode(`${contentChunk}${errorChunk}`);
+
+    const fetchImpl = vi.fn(async (url) => {
+      if (String(url).includes('nvidia.com')) {
+        nvidiaCalls += 1;
+        let read = false;
+        return {
+          ok: true,
+          status: 200,
+          body: {
+            getReader() {
+              return {
+                async read() {
+                  if (read) return { done: true, value: undefined };
+                  read = true;
+                  return { done: false, value: encoded };
+                },
+              };
+            },
+          },
+          async text() {
+            return `${contentChunk}${errorChunk}`;
+          },
+        };
+      }
+      throw new Error('OpenRouter should not be called after partial NVIDIA output');
+    });
+
+    const result = await runChatCompletions({
+      messages: [{ role: 'user', content: 'hi' }],
+      env: { NVIDIA_API_KEY: 'nvapi-test', OPENROUTER_API_KEY: 'sk-or-v1-ok' },
+      fetchImpl,
+      onEvent: (event) => events.push(event),
+      sleepFn: async () => {},
+    });
+
+    expect(nvidiaCalls).toBe(1);
+    expect(result.ok).toBe(false);
+    expect(events.some((event) => event.type === 'content' && event.text === 'Halo')).toBe(true);
+    expect(events.some((event) => event.type === 'fallback')).toBe(false);
+    expect(events.some((event) => event.type === 'meta' && event.provider === 'openrouter')).toBe(false);
+    expect(events.filter((event) => event.type === 'done')).toHaveLength(0);
+    expect(events.some((event) => event.type === 'error')).toBe(true);
+  });
 });

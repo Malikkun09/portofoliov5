@@ -209,7 +209,9 @@ function ChatbotApp() {
         });
 
         if (!response.ok || !response.body) {
-          throw new Error(`Chat request failed (${response.status})`);
+          sawError = true;
+          setError(response.status === 405 ? 'Metode tidak diizinkan. / Method not allowed.' : 'Tidak bisa terhubung ke server chat. Coba lagi. / Could not reach the chat server.');
+          return;
         }
 
         const reader = response.body.getReader();
@@ -274,7 +276,8 @@ function ChatbotApp() {
         }
       } catch (streamError) {
         sawError = true;
-        setError(streamError.message || 'Streaming gagal. Coba lagi. / Streaming failed.');
+        const isAbort = streamError?.name === 'AbortError';
+        setError(isAbort ? 'Waktu habis. Coba lagi. / Request timed out.' : 'Tidak bisa terhubung ke server chat. Coba lagi. / Could not reach the chat server.');
       } finally {
         setIsStreaming(false);
         finalizeAssistant(sawError);
@@ -322,9 +325,8 @@ function ChatbotApp() {
     const withoutLastAssistant = messages[messages.length - 1]?.role === 'assistant' ? messages.slice(0, -1) : messages;
     if (withoutLastAssistant.length === 0) return;
 
-    setMessages(withoutLastAssistant);
     const apiMessages = toApiMessages(withoutLastAssistant);
-    await streamChat({ apiMessages });
+    await streamChat({ apiMessages, replaceLastAssistant: true });
   };
 
   const handleFileSelect = async (event) => {
@@ -379,7 +381,7 @@ function ChatbotApp() {
         </div>
       </div>
 
-      <section ref={stageRef} className={clsx(styles.stage, isEmpty && styles.stageEmpty)} aria-live="polite" data-lenis-prevent>
+      <div ref={stageRef} className={clsx(styles.stage, isEmpty && styles.stageEmpty)} aria-live="polite" data-lenis-prevent>
         {isEmpty ? (
           <div className={styles.emptyState}>
             <h1 className={styles.emptyTitle}>Ada yang bisa dibantu?</h1>
@@ -430,7 +432,7 @@ function ChatbotApp() {
             <div ref={messagesEndRef} />
           </div>
         )}
-      </section>
+      </div>
 
       <div className={styles.dock}>
         <div className={styles.dockInner}>

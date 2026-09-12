@@ -1,5 +1,7 @@
 .root {
-  min-height: 100svh;
+  height: 100svh;
+  max-height: 100svh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   color: var(--white);
@@ -97,6 +99,8 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0.5rem var(--layout-margin) 1rem;
+  box-shadow: none;
+  background: transparent;
 }
 
 .stageEmpty {
@@ -137,6 +141,7 @@
 
 .message {
   line-height: 1.55;
+  user-select: text;
 }
 
 .userMessage {
@@ -179,6 +184,7 @@
     word-break: break-word;
     font-family: inherit;
     font-size: 0.85rem;
+    user-select: text;
   }
 }
 

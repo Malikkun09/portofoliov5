@@ -10,7 +10,7 @@ export const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completion
 
 const REQUEST_TIMEOUT_MS = 120000;
 const NVIDIA_RETRY_DELAY_MS = 800;
-const OPENROUTER_MAX_TOKENS = 4096;
+const OPENROUTER_MAX_TOKENS = 16384;
 
 function messageHasVideoOrAudio(messages) {
   return messages.some((message) => {
@@ -152,7 +152,7 @@ async function pipeProviderStream({ response, onEvent, provider }) {
     lines.forEach(consumeLine);
   }
 
-  if (hasOutput) {
+  if (hasOutput && !streamError) {
     onEvent({ type: 'done' });
   }
 
@@ -198,18 +198,26 @@ async function tryNvidiaStream({ messages, enableThinking, env, fetchImpl, onEve
       provider: 'nvidia',
     });
     if (streamResult.streamError) {
-      return classifyProviderFailure({
+      const classified = classifyProviderFailure({
         provider: 'nvidia',
         bodyText: streamResult.streamError,
-        status: 502,
+        status: streamResult.hasOutput ? 0 : 502,
       });
+      return {
+        ...classified,
+        hasOutput: streamResult.hasOutput,
+        retryable: streamResult.hasOutput ? false : classified.retryable,
+      };
     }
     if (!streamResult.hasOutput) {
-      return classifyProviderFailure({
-        provider: 'nvidia',
-        bodyText: 'empty stream',
-        status: 502,
-      });
+      return {
+        ...classifyProviderFailure({
+          provider: 'nvidia',
+          bodyText: 'empty stream',
+          status: 502,
+        }),
+        hasOutput: false,
+      };
     }
     return { ok: true, provider: 'nvidia' };
   } catch (error) {
@@ -254,18 +262,26 @@ async function tryOpenRouterStream({ messages, enableThinking, env, fetchImpl, o
       provider: 'openrouter',
     });
     if (streamResult.streamError) {
-      return classifyProviderFailure({
+      const classified = classifyProviderFailure({
         provider: 'openrouter',
         bodyText: streamResult.streamError,
-        status: 502,
+        status: streamResult.hasOutput ? 0 : 502,
       });
+      return {
+        ...classified,
+        hasOutput: streamResult.hasOutput,
+        retryable: false,
+      };
     }
     if (!streamResult.hasOutput) {
-      return classifyProviderFailure({
-        provider: 'openrouter',
-        bodyText: 'empty stream',
-        status: 502,
-      });
+      return {
+        ...classifyProviderFailure({
+          provider: 'openrouter',
+          bodyText: 'empty stream',
+          status: 502,
+        }),
+        hasOutput: false,
+      };
     }
     return { ok: true, provider: 'openrouter' };
   } catch (error) {
@@ -308,20 +324,31 @@ export async function runChatCompletions({ messages, enableThinking = true, env 
     nvidiaResult = await retryOnce(() => tryNvidiaStream({ messages, enableThinking, env, fetchImpl, onEvent }), {
       delayMs: NVIDIA_RETRY_DELAY_MS,
       sleepFn,
-      shouldRetry: (result) => result?.code === 'rate_limit' || result?.status === 429 || result?.status === 503,
+      shouldRetry: (result) => Boolean(result?.retryable && (result?.code === 'rate_limit' || result?.status === 429 || result?.status === 503)),
     });
 
     if (nvidiaResult.ok) {
       return nvidiaResult;
     }
+
+    if (nvidiaResult.hasOutput) {
+      onEvent({
+        type: 'error',
+        message: nvidiaResult.message || 'NVIDIA gagal merespons. / NVIDIA request failed.',
+        code: nvidiaResult.code,
+      });
+      return { ok: false, ...nvidiaResult };
+    }
   }
 
   if (openRouterKey) {
-    onEvent({
-      type: 'fallback',
-      message: nvidiaResult.message || 'Primary NVIDIA provider unavailable. Trying free OpenRouter fallback…',
-      code: nvidiaResult.code,
-    });
+    if (nvidiaKey) {
+      onEvent({
+        type: 'fallback',
+        message: nvidiaResult.message || 'Primary NVIDIA provider unavailable. Trying free OpenRouter fallback…',
+        code: nvidiaResult.code,
+      });
+    }
 
     const openRouterResult = await tryOpenRouterStream({
       messages,
@@ -332,6 +359,15 @@ export async function runChatCompletions({ messages, enableThinking = true, env 
     });
     if (openRouterResult.ok) {
       return openRouterResult;
+    }
+
+    if (openRouterResult.hasOutput) {
+      onEvent({
+        type: 'error',
+        message: openRouterResult.message,
+        code: openRouterResult.code,
+      });
+      return { ok: false, ...openRouterResult };
     }
 
     const finalError = composeFinalError({
