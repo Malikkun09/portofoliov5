@@ -100,14 +100,14 @@ function ChatbotApp() {
     setShowThinking(session.showThinking ?? true);
 
     gsap.set('html', {
-      '--black': '#0e0e0f',
-      '--white': '#ececec',
-      '--accentColor': '#ececec',
+      '--black': '#141416',
+      '--white': '#f0f4f1',
+      '--accentColor': '#f0f4f1',
       '--fillColor': '#c6ff3d',
-      '--menuColor': '#2f2f31',
-      '--menuFontColor': '#ececec',
+      '--menuColor': '#ececec',
+      '--menuFontColor': '#141416',
     });
-    setFluidColor('#2a2a2c');
+    setFluidColor('#d7d7d4');
 
     return () => {
       purgeAllMedia();
@@ -371,14 +371,9 @@ function ChatbotApp() {
     <div className={styles.root}>
       <div className={styles.topBar}>
         <p className={styles.modelHint}>{provider ? `via ${provider}` : 'Chat'}</p>
-        <div className={styles.topActions}>
-          <button type="button" className={styles.iconButton} onClick={() => setShowThinking((value) => !value)} aria-pressed={showThinking} title="Show or hide model thinking">
-            {showThinking ? 'Thinking on' : 'Thinking off'}
-          </button>
-          <button type="button" className={styles.roundButton} onClick={handleClearSession} disabled={isStreaming} aria-label="New chat">
-            <RefreshIcon />
-          </button>
-        </div>
+        <button type="button" className={styles.roundButton} onClick={handleClearSession} disabled={isStreaming} aria-label="New chat">
+          <RefreshIcon />
+        </button>
       </div>
 
       <div ref={stageRef} className={clsx(styles.stage, isEmpty && styles.stageEmpty)} aria-live="polite" data-lenis-prevent>
@@ -507,6 +502,10 @@ function ChatbotApp() {
           </form>
 
           <p className={styles.caption}>
+            <button type="button" className={styles.inlineAction} onClick={() => setShowThinking((value) => !value)} aria-pressed={showThinking} title="Show or hide model thinking">
+              {showThinking ? 'Thinking on' : 'Thinking off'}
+            </button>
+            {' · '}
             Media auto-hapus {purgeMinutes} menit
             {mediaExpiryAt ? ` · ~${expiryCountdown} min left` : ''} · session only
             {lastAssistant && !lastAssistant.isStreaming ? (
