@@ -16,6 +16,7 @@
   gap: 0.75rem;
   padding: 0 var(--layout-margin) 0.45rem;
   flex-shrink: 0;
+  z-index: 2;
 }
 
 .topIdentity {
@@ -109,7 +110,11 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scroll-behavior: auto;
   padding: 0.5rem var(--layout-margin) 1rem;
   box-shadow: none;
   background: transparent;
@@ -264,6 +269,9 @@
 }
 
 .dock {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
   padding: 0 var(--layout-margin) calc(0.85rem + env(safe-area-inset-bottom, 0px));
 }
 
