@@ -1,14 +1,33 @@
+import { PAYLOAD_TOO_LARGE_MESSAGE } from '@src/lib/chat/payloadValidation';
+
+function isPayloadTooLargeMessage(message) {
+  const detail = String(message || '').toLowerCase();
+  return (
+    detail.includes('payload too large') ||
+    detail.includes('function_payload_too_large') ||
+    detail.includes('request entity too large') ||
+    detail.includes('body exceeded') ||
+    detail.includes('content too large')
+  );
+}
+
+export function formatPayloadTooLargeError(serverMessage = '') {
+  const detail = String(serverMessage || '').trim();
+  if (detail && !isPayloadTooLargeMessage(detail)) {
+    return `${detail} / ${PAYLOAD_TOO_LARGE_MESSAGE}`;
+  }
+  return PAYLOAD_TOO_LARGE_MESSAGE;
+}
+
 export function formatChatHttpError(status, serverMessage = '') {
   const detail = String(serverMessage || '').trim();
 
-  if (status === 405) {
-    return 'Metode tidak diizinkan. / Method not allowed.';
+  if (status === 413 || isPayloadTooLargeMessage(detail)) {
+    return formatPayloadTooLargeError(detail);
   }
 
-  if (status === 413) {
-    return detail
-      ? `${detail} / Payload too large.`
-      : 'Lampiran terlalu besar untuk dikirim. Kompres gambar atau kirim file lebih kecil. / Attachment payload too large.';
+  if (status === 405) {
+    return 'Metode tidak diizinkan. / Method not allowed.';
   }
 
   if (status === 400) {

@@ -1,3 +1,4 @@
+import { validateChatRequestBody } from '@src/lib/chat/payloadValidation';
 import { runChatCompletions } from '@src/lib/chat/runCompletions';
 
 function writeSseEvent(res, payload) {
@@ -10,11 +11,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { messages, enableThinking = true } = req.body || {};
+  const validation = validateChatRequestBody(req.body || {});
 
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: 'messages must be a non-empty array' });
+  if (!validation.ok) {
+    return res.status(validation.status).json({
+      error: validation.error,
+      code: validation.code || undefined,
+    });
   }
+
+  const { messages, enableThinking = true } = req.body;
 
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -41,7 +47,7 @@ export default async function handler(req, res) {
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '25mb',
+      sizeLimit: '4mb',
     },
     responseLimit: false,
   },

@@ -7,11 +7,14 @@ import {
   formatChatHttpError,
   formatChatNetworkError,
   formatChatStreamDisconnectError,
+  formatPayloadTooLargeError,
   readChatHttpErrorMessage,
 } from '@src/lib/chat/clientErrors';
 import { formatExpiryCountdown, getMediaPurgeMinutes, purgeAllMedia, registerMedia, restoreMediaFromSession } from '@src/lib/chat/mediaCache';
-import { clearSession, loadSession, saveSession, toApiMessages } from '@src/lib/chat/session';
+import { buildApiPayload } from '@src/lib/chat/payloadBudget';
+import { clearSession, loadSession, saveSession } from '@src/lib/chat/session';
 import { sanitizeAssistantMessage } from '@src/lib/chat/thinking';
+import ChatMarkdown from '@src/pages/projects/chatbot/components/ChatMarkdown';
 import styles from '@src/pages/projects/chatbot/chatbot.module.scss';
 import { gsap } from 'gsap';
 import { useStore } from '@src/store';
@@ -299,7 +302,7 @@ function ChatbotApp() {
 
               if (event.type === 'error') {
                 sawError = true;
-                setError(event.message);
+                setError(formatChatHttpError(502, event.message));
                 setStatus('');
               }
 
@@ -345,6 +348,26 @@ function ChatbotApp() {
     [finalizeAssistant, showThinking],
   );
 
+  const sendApiPayload = useCallback(
+    async (uiMessages, options = {}) => {
+      const payload = buildApiPayload(uiMessages, { enableThinking: showThinking });
+
+      if (payload.error === 'PAYLOAD_TOO_LARGE') {
+        setError(formatPayloadTooLargeError());
+        return false;
+      }
+
+      if (payload.error || payload.messages.length === 0) {
+        setError(formatChatHttpError(400, payload.error || 'Invalid request'));
+        return false;
+      }
+
+      await streamChat({ apiMessages: payload.messages, ...options });
+      return true;
+    },
+    [showThinking, streamChat],
+  );
+
   const handleSend = async () => {
     if (isStreaming) return;
 
@@ -375,8 +398,7 @@ function ChatbotApp() {
     setDraft('');
     setPendingAttachments([]);
 
-    const apiMessages = toApiMessages(nextMessages);
-    await streamChat({ apiMessages });
+    await sendApiPayload(nextMessages);
   };
 
   const handleRegenerate = async () => {
@@ -386,8 +408,7 @@ function ChatbotApp() {
     if (withoutLastAssistant.length === 0) return;
 
     shouldAutoScrollRef.current = true;
-    const apiMessages = toApiMessages(withoutLastAssistant);
-    await streamChat({ apiMessages, replaceLastAssistant: true });
+    await sendApiPayload(withoutLastAssistant, { replaceLastAssistant: true });
   };
 
   const handleFileSelect = async (event) => {
@@ -492,11 +513,13 @@ function ChatbotApp() {
                     {showThinking && reasoning ? (
                       <details className={styles.thinkingBlock}>
                         <summary>{message.isStreaming && !hasAnswer ? 'Thinking…' : 'Show model thinking'}</summary>
-                        <pre>{reasoning}</pre>
+                        <ChatMarkdown source={reasoning} variant="thinking" />
                       </details>
                     ) : null}
 
-                    <div className={styles.messageText}>{hasAnswer ? visibleContent : message.isStreaming ? '…' : ''}</div>
+                    <div className={styles.messageText}>
+                      {hasAnswer ? <ChatMarkdown source={visibleContent} /> : message.isStreaming ? '…' : null}
+                    </div>
                   </article>
 
                   {index === messages.length - 1 && !message.isStreaming && hasAnswer ? (

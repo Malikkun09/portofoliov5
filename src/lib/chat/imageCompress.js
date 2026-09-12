@@ -57,9 +57,10 @@ export async function compressImageFile(file, { maxEdge = IMAGE_MAX_EDGE, qualit
   const image = await loadImageElement(originalDataUrl);
   const { width, height, scale } = computeScaledDimensions(image.width, image.height, maxEdge);
   const shouldResize = scale < 1;
-  const shouldReencode = file.size >= IMAGE_COMPRESS_THRESHOLD_BYTES || shouldResize;
+  const shouldReencode =
+    shouldResize || file.size >= IMAGE_COMPRESS_THRESHOLD_BYTES || !/^image\/(jpe?g|webp)$/i.test(file.type || '');
 
-  if (!shouldReencode) {
+  if (!shouldReencode && file.size < IMAGE_COMPRESS_THRESHOLD_BYTES) {
     return originalDataUrl;
   }
 
