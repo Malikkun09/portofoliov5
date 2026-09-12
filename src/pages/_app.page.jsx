@@ -88,6 +88,16 @@ function MyApp({ Component, pageProps, router }) {
     }
   }, [lenis]);
 
+  useIsomorphicLayoutEffect(() => {
+    const isChat = router.pathname === '/projects/chatbot' || router.pathname === '/projects/chat';
+    if (isChat) {
+      document.documentElement.dataset.chat = '1';
+      lenis?.stop();
+      return;
+    }
+    delete document.documentElement.dataset.chat;
+  }, [router.pathname, lenis]);
+
   useFrame((time) => {
     if (lenis) {
       lenis.raf(time);

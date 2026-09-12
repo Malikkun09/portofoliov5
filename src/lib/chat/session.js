@@ -1,3 +1,5 @@
+import { sanitizeAssistantMessage } from '@src/lib/chat/thinking';
+
 const SESSION_KEY = 'chatbot-session-v1';
 
 const defaultSession = () => ({
@@ -16,7 +18,9 @@ export function loadSession() {
     return {
       ...defaultSession(),
       ...parsed,
-      messages: Array.isArray(parsed.messages) ? parsed.messages : [],
+      messages: Array.isArray(parsed.messages)
+        ? parsed.messages.map((message) => (message?.role === 'assistant' ? sanitizeAssistantMessage(message) : message))
+        : [],
     };
   } catch {
     return defaultSession();
@@ -42,7 +46,11 @@ export function clearSession() {
 
 export function toApiMessages(messages) {
   return messages
-    .filter((message) => message.role === 'user' || message.role === 'assistant')
+    .filter((message) => {
+      if (message.role === 'user') return true;
+      if (message.role !== 'assistant') return false;
+      return Boolean(String(message.content || '').trim() || String(message.reasoning || '').trim());
+    })
     .map((message) => {
       if (message.role === 'user') {
         const parts = [];
