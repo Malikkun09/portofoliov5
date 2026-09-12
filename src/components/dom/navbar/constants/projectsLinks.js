@@ -2,6 +2,7 @@ const projectsLinks = [
   {
     title: 'Multimodal Chatbot',
     href: '/projects/chatbot',
+    isNew: true,
   },
   {
     title: 'YOLO-World',

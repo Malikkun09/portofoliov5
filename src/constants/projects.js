@@ -2,6 +2,7 @@ const projects = [
   {
     id: 'chatbot',
     title: 'Multimodal Chatbot',
+    isNew: true,
     img: '/project7/project7.webp',
     link: '/projects/chatbot',
     date: '2026',

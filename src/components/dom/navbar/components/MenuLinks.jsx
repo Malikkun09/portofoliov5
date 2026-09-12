@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import footerLinks from '@src/components/dom/navbar/constants/footerLinks';
 import gsap from 'gsap';
 import menuLinks from '@src/components/dom/navbar/constants/menuLinks';
+import ProjectNewBadge from '@src/components/dom/ProjectNewBadge';
 import projectsLinks from '@src/components/dom/navbar/constants/projectsLinks';
 import profile from '@src/constants/profile';
 import styles from '@src/components/dom/navbar/styles/menuLinks.module.scss';
@@ -152,7 +153,10 @@ function MenuLinks() {
               className={styles.menuListItem}
             >
               <Link aria-label={`Go ${link.title}`} scroll={false} href={link.href}>
-                <span>{link.title}</span>
+                <span className={styles.menuLinkText}>
+                  <span>{link.title}</span>
+                  {link.isNew ? <ProjectNewBadge /> : null}
+                </span>
               </Link>
             </div>
           ))}
