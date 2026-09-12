@@ -5,6 +5,7 @@ import ButtonLink from '@src/components/animationComponents/buttonLink/Index';
 import Image from 'next/image';
 import Link from 'next/link';
 import clsx from 'clsx';
+import ProjectNewBadge from '@src/components/dom/ProjectNewBadge';
 import projects from '@src/constants/projects';
 import styles from '@src/pages/components/projects/styles/projects.module.scss';
 import useIsMobile from '@src/hooks/useIsMobile';
@@ -57,7 +58,10 @@ function Projects() {
                     className={styles.projectsDetails}
                   >
                     <h6 className="h6">{project.date}</h6>
-                    <h3 className="h3">{project.title}</h3>
+                    <h3 className="h3">
+                      {project.title}
+                      {project.isNew ? <ProjectNewBadge /> : null}
+                    </h3>
                     <div className={styles.projectActions}>
                       <ButtonLink compact href={project.link} label="VIEW PROJECT" />
                       {project.liveLink ? <ButtonLink compact target href={project.liveLink} label="LIVE SITE" /> : null}

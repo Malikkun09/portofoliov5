@@ -158,6 +158,12 @@
   }
 }
 
+.menuLinkText {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+}
+
 .menuListItem.menuListItemActive {
   &::after {
     opacity: 1;
