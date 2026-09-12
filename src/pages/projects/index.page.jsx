@@ -1,0 +1,102 @@
+/* eslint-disable react/jsx-props-no-spreading */
+/* eslint-disable no-nested-ternary */
+
+import ButtonLink from '@src/components/animationComponents/buttonLink/Index';
+import CustomHead from '@src/components/dom/CustomHead';
+import Image from 'next/image';
+import Link from 'next/link';
+import clsx from 'clsx';
+import ProjectNewBadge from '@src/components/dom/ProjectNewBadge';
+import projects from '@src/constants/projects';
+import styles from '@src/pages/projects/projects.module.scss';
+import useIsMobile from '@src/hooks/useIsMobile';
+import useProjectStackAnimation from '@src/hooks/useProjectStackAnimation';
+import { useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { useStore } from '@src/store';
+
+const seo = {
+  title: 'John Doe — Projects',
+  description: 'Sample projects included with the Portfolio V5 template: multimodal chatbot, motion studio, product landing, and admin dashboard demos.',
+  keywords: ['Portfolio Projects', 'Next.js', 'GSAP', 'React', 'Chatbot', 'Frontend', 'Web Development'],
+};
+
+function Page() {
+  const isMobile = useIsMobile();
+  const projectRefs = useRef([]);
+  const detailRefs = useRef([]);
+  const [isLoading] = useStore(useShallow((state) => [state.isLoading]));
+
+  useProjectStackAnimation({ isLoading, canvasRefs: projectRefs, detailRefs });
+
+  return (
+    <>
+      <CustomHead {...seo} />
+      <section className={clsx(styles.titleContainer, 'layout-block-inner')}>
+        <h1 className={clsx(styles.title, 'h1')}>All Projects</h1>
+      </section>
+      <section className={clsx(styles.root, 'layout-block-inner')}>
+        <div className={styles.innerContainer}>
+          {projects.map((project, index) => (
+            <article id={project.id} key={project.id} className={clsx(styles.card)}>
+              <div
+                style={
+                  !isMobile
+                    ? {
+                        height: index === projects.length - 1 ? '200svh' : `${200 + 100 * index}svh`,
+                        top: index === 0 ? '0px' : '-100svh',
+                      }
+                    : {
+                        height: index === projects.length - 1 ? '100svh' : `${200 + 100 * index}svh`,
+                        top: index === 0 ? '0px' : '-50svh',
+                      }
+                }
+                className={styles.projectsWrap}
+              >
+                <div className={clsx(styles.container, 'layout-grid-inner')}>
+                  <div
+                    ref={(el) => {
+                      detailRefs.current[index] = el;
+                    }}
+                    className={styles.projectsDetails}
+                  >
+                    <h6 className={clsx(styles.text, 'h6')}>{project.date}</h6>
+                    <h3 className={clsx(styles.text, 'h3')}>
+                      {project.title}
+                      {project.isNew ? <ProjectNewBadge /> : null}
+                    </h3>
+                    <div className={styles.projectActions}>
+                      <ButtonLink compact href={project.link} label="VIEW PROJECT" />
+                      {project.liveLink ? <ButtonLink compact target href={project.liveLink} label="LIVE SITE" /> : null}
+                    </div>
+                  </div>
+                  <Link aria-label={`View ${project.title}`} scroll={false} href={project.link} className={styles.imageContainer}>
+                    <Image priority={index === 0} sizes="100%" src={project.img} fill alt={project.title} style={{ objectFit: 'cover' }} />
+                  </Link>
+                </div>
+              </div>
+              <div
+                ref={(el) => {
+                  projectRefs.current[index] = el;
+                }}
+                className={styles.canvas}
+              >
+                <Image
+                  priority={index === 0}
+                  sizes="100%"
+                  className={index === 0 ? styles.firstCard : index === projects.length - 1 ? styles.lastCard : undefined}
+                  src={project.img}
+                  fill
+                  alt={project.title}
+                  style={{ objectFit: 'cover' }}
+                />
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+export default Page;

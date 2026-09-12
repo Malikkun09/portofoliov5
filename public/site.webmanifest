@@ -1,0 +1,25 @@
+{
+  "name": "Portfolio V5 Template",
+  "short_name": "Portfolio",
+  "description": "A Next.js portfolio template with GSAP motion, WebGL fluid, and a multimodal chatbot demo.",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "theme_color": "#28282b",
+  "background_color": "#f0f4f1",
+  "start_url": "/",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait"
+}

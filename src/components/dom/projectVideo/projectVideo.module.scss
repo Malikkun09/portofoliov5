@@ -1,0 +1,144 @@
+@import '@src/styles/functions';
+
+.root {
+  position: relative;
+  width: 100%;
+}
+
+.sizer {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.player {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: calc(var(--layout-columns-gap) * 0.5);
+  cursor: default;
+  touch-action: pan-y;
+  @include mobile {
+    border-radius: calc(var(--layout-columns-gap) * 0.25);
+  }
+}
+
+.video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  background: #111;
+}
+
+.centerPlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
+  width: 4.8vw;
+  height: 4.8vw;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(10, 10, 12, 0.72);
+  color: var(--white);
+  font-size: 1.6vw;
+  line-height: 1;
+  pointer-events: auto;
+  @include mobile {
+    width: 14vw;
+    height: 14vw;
+    font-size: 5vw;
+  }
+}
+
+.controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--layout-columns-gap) * 0.4);
+  padding: 0.7vw 0.9vw 1vw;
+  background: linear-gradient(180deg, rgba(10, 10, 12, 0) 0%, rgba(10, 10, 12, 0.82) 42%, rgba(10, 10, 12, 0.92) 100%);
+  opacity: 0;
+  transform: translateY(0.35vw);
+  pointer-events: none;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+  @include mobile {
+    padding: 2.2vw 2.6vw 2.8vw;
+    gap: 1.4vw;
+  }
+}
+
+.controlsVisible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.showControls .progressTrack {
+  opacity: 0;
+}
+
+.paused .controls {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.controlButton {
+  pointer-events: auto;
+  border: 0.08vw solid var(--white);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--black);
+  border-radius: 9vw;
+  padding: 0.35vw 0.75vw;
+  line-height: 1;
+  white-space: nowrap;
+  @include mobile {
+    padding: 1.2vw 2.2vw;
+    border-width: 0.2vw;
+  }
+}
+
+.time {
+  color: var(--white);
+  min-width: 6vw;
+  white-space: nowrap;
+}
+
+.seek {
+  flex: 1 1 12vw;
+  min-width: 8vw;
+  accent-color: var(--fillColor);
+  cursor: pointer;
+}
+
+.progressTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  height: 0.22vw;
+  background: rgba(240, 244, 241, 0.25);
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  @include mobile {
+    height: 0.55vw;
+  }
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  background: var(--fillColor);
+}
