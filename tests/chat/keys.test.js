@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { readApiKey, readOpenRouterKeys, shouldRotateOpenRouterKey } from '../../src/lib/chat/keys';
+import { OPENROUTER_MAX_KEY_ATTEMPTS, readApiKey, readOpenRouterKeys, selectOpenRouterKeysToTry, shouldRotateOpenRouterKey } from '../../src/lib/chat/keys';
 
 describe('readApiKey', () => {
   it('trims whitespace and surrounding quotes from NVIDIA_API_KEY', () => {
@@ -45,15 +45,35 @@ describe('readOpenRouterKeys', () => {
 });
 
 describe('shouldRotateOpenRouterKey', () => {
-  it('rotates on 401/429/503 without partial output', () => {
+  it('rotates on 401/403/429/503 without partial output', () => {
     expect(shouldRotateOpenRouterKey({ ok: false, status: 401, code: 'invalid_key' })).toBe(true);
+    expect(shouldRotateOpenRouterKey({ ok: false, status: 403, code: 'invalid_key' })).toBe(true);
     expect(shouldRotateOpenRouterKey({ ok: false, status: 429, code: 'rate_limit' })).toBe(true);
     expect(shouldRotateOpenRouterKey({ ok: false, status: 503, code: 'rate_limit' })).toBe(true);
+    expect(shouldRotateOpenRouterKey({ ok: false, status: 402, code: 'rate_limit' })).toBe(true);
   });
 
   it('does not rotate after a partial stream or success', () => {
     expect(shouldRotateOpenRouterKey({ ok: false, status: 503, code: 'rate_limit', hasOutput: true })).toBe(false);
     expect(shouldRotateOpenRouterKey({ ok: true, provider: 'openrouter' })).toBe(false);
     expect(shouldRotateOpenRouterKey({ ok: false, status: 500, code: 'unknown' })).toBe(false);
+  });
+});
+
+describe('selectOpenRouterKeysToTry', () => {
+  it('caps the pool at three random unique keys', () => {
+    const pool = Array.from({ length: 10 }, (_, index) => `sk-or-v1-${index}`);
+    const picked = selectOpenRouterKeysToTry(pool);
+
+    expect(picked).toHaveLength(OPENROUTER_MAX_KEY_ATTEMPTS);
+    expect(new Set(picked).size).toBe(OPENROUTER_MAX_KEY_ATTEMPTS);
+    picked.forEach((key) => expect(pool).toContain(key));
+  });
+
+  it('uses the injected random function to shuffle', () => {
+    const pool = ['sk-or-v1-a', 'sk-or-v1-b', 'sk-or-v1-c'];
+    const picked = selectOpenRouterKeysToTry(pool, { random: () => 0 });
+
+    expect(picked).toEqual(['sk-or-v1-b', 'sk-or-v1-c', 'sk-or-v1-a']);
   });
 });

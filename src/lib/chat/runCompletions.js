@@ -1,5 +1,5 @@
 import { resolveOpenRouterModels } from '@src/lib/chat/fallbackModels';
-import { NVIDIA_KEY_NAMES, readApiKey, readOpenRouterKeys, shouldRotateOpenRouterKey } from '@src/lib/chat/keys';
+import { NVIDIA_KEY_NAMES, readApiKey, readOpenRouterKeys, selectOpenRouterKeysToTry, shouldRotateOpenRouterKey } from '@src/lib/chat/keys';
 import { classifyProviderFailure, composeFinalError } from '@src/lib/chat/providerErrors';
 import { retryOnce } from '@src/lib/chat/retry';
 import { createThinkingSplitter } from '@src/lib/chat/thinking';
@@ -291,8 +291,9 @@ async function tryOpenRouterStreamWithKey({ apiKey, messages, enableThinking, en
   }
 }
 
-async function tryOpenRouterStream({ messages, enableThinking, env, fetchImpl, onEvent }) {
-  const keys = readOpenRouterKeys(env);
+async function tryOpenRouterStream({ messages, enableThinking, env, fetchImpl, onEvent, selectOpenRouterKeys }) {
+  const pool = readOpenRouterKeys(env);
+  const keys = selectOpenRouterKeys(pool);
   if (keys.length === 0) {
     return classifyProviderFailure({
       provider: 'openrouter',
@@ -305,6 +306,7 @@ async function tryOpenRouterStream({ messages, enableThinking, env, fetchImpl, o
     missingKey: true,
   });
 
+  // Random subset of the pool, capped at 3 attempts — do not burn every key on one request.
   for (let index = 0; index < keys.length; index += 1) {
     // eslint-disable-next-line no-await-in-loop
     const result = await tryOpenRouterStreamWithKey({
@@ -330,7 +332,15 @@ async function tryOpenRouterStream({ messages, enableThinking, env, fetchImpl, o
   return lastFailure;
 }
 
-export async function runChatCompletions({ messages, enableThinking = true, env = process.env, fetchImpl = fetch, onEvent = () => {}, sleepFn }) {
+export async function runChatCompletions({
+  messages,
+  enableThinking = true,
+  env = process.env,
+  fetchImpl = fetch,
+  onEvent = () => {},
+  sleepFn,
+  selectOpenRouterKeys = selectOpenRouterKeysToTry,
+}) {
   const nvidiaKey = readApiKey(NVIDIA_KEY_NAMES, env);
   const openRouterKeys = readOpenRouterKeys(env);
   const openRouterKey = openRouterKeys[0] || '';
@@ -394,6 +404,7 @@ export async function runChatCompletions({ messages, enableThinking = true, env 
       env,
       fetchImpl,
       onEvent,
+      selectOpenRouterKeys,
     });
     if (openRouterResult.ok) {
       return openRouterResult;

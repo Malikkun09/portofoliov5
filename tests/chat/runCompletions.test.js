@@ -228,6 +228,7 @@ describe('runChatCompletions', () => {
       fetchImpl,
       onEvent: (event) => events.push(event),
       sleepFn: async () => {},
+      selectOpenRouterKeys: (keys) => keys,
     });
 
     expect(result.ok).toBe(true);
@@ -258,9 +259,42 @@ describe('runChatCompletions', () => {
       fetchImpl,
       onEvent: () => {},
       sleepFn: async () => {},
+      selectOpenRouterKeys: (keys) => keys,
     });
 
     expect(result.ok).toBe(true);
     expect(usedKeys).toEqual(['Bearer sk-or-v1-one', 'Bearer sk-or-v1-two']);
+  });
+
+  it('tries at most three OpenRouter keys even when ten are configured', async () => {
+    const events = [];
+    const usedKeys = [];
+    const pool = Array.from({ length: 10 }, (_, index) => `sk-or-v1-${index}`);
+    const fetchImpl = vi.fn(async (url, options) => {
+      if (String(url).includes('nvidia.com')) {
+        return jsonErrorResponse(503, { error: 'ResourceExhausted' });
+      }
+      usedKeys.push(options.headers.Authorization);
+      return jsonErrorResponse(429, { error: { message: 'quota exceeded' } });
+    });
+
+    const result = await runChatCompletions({
+      messages: [{ role: 'user', content: 'hi' }],
+      env: {
+        NVIDIA_API_KEY: 'nvapi-test',
+        OPENROUTER_API_KEYS: pool.join(','),
+      },
+      fetchImpl,
+      onEvent: (event) => events.push(event),
+      sleepFn: async () => {},
+    });
+
+    expect(result.ok).toBe(false);
+    expect(usedKeys).toHaveLength(3);
+    expect(new Set(usedKeys).size).toBe(3);
+    usedKeys.forEach((header) => {
+      expect(header).toMatch(/^Bearer sk-or-v1-\d+$/);
+    });
+    expect(JSON.stringify(events)).not.toMatch(/sk-or-v1/);
   });
 });

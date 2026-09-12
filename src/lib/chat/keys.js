@@ -52,6 +52,8 @@ export function readOpenRouterKeys(env = process.env) {
   return keys;
 }
 
+export const OPENROUTER_MAX_KEY_ATTEMPTS = 3;
+
 export function shouldRotateOpenRouterKey(result) {
   if (!result || result.ok || result.hasOutput) return false;
 
@@ -61,4 +63,23 @@ export function shouldRotateOpenRouterKey(result) {
   }
 
   return result.code === 'invalid_key' || result.code === 'rate_limit';
+}
+
+/**
+ * Shuffle the OpenRouter key pool and keep at most `maxAttempts` keys.
+ * NVIDIA stays primary elsewhere; this only chooses which OpenRouter keys to try.
+ */
+export function selectOpenRouterKeysToTry(keys, { maxAttempts = OPENROUTER_MAX_KEY_ATTEMPTS, random = Math.random } = {}) {
+  const pool = Array.isArray(keys) ? keys.filter(Boolean) : [];
+  const limit = Math.max(0, Number(maxAttempts) || 0);
+  if (pool.length <= 1) return pool.slice(0, limit);
+
+  for (let index = pool.length - 1; index > 0; index -= 1) {
+    const swapWith = Math.floor(random() * (index + 1));
+    const current = pool[index];
+    pool[index] = pool[swapWith];
+    pool[swapWith] = current;
+  }
+
+  return pool.slice(0, Math.min(limit, pool.length));
 }

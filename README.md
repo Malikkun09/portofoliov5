@@ -34,7 +34,7 @@ Set these **server-only** variables on Vercel (Production + Preview). Do not com
 | --- | --- | --- |
 | `NVIDIA_API_KEY` | Primary | NVIDIA Integrate API key. `NVAPI_KEY` also works. Values are trimmed. |
 | `OPENROUTER_API_KEY` | Strongly recommended | Free account key for `:free` multimodal fallback when NVIDIA returns 429/503 quota errors. |
-| `OPENROUTER_API_KEYS` | Optional | Extra OpenRouter keys, comma or newline separated. On 401/429/503/quota the next unused key is tried. |
+| `OPENROUTER_API_KEYS` | Optional | Extra OpenRouter keys, comma or newline separated. After NVIDIA fails, up to 3 keys are picked at random from the merged pool. |
 | `OPENROUTER_MODEL` | Optional | Override the first OpenRouter model. Default is `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`. `xiaomi/mimo-v2.5` is omnimodal but **paid**. |
 | `OPENROUTER_FALLBACK_MODELS` | Optional | Comma-separated extra OpenRouter model ids. |
 | `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` | Optional | Referer metadata for OpenRouter. |
