@@ -1,5 +1,5 @@
 import { resolveOpenRouterModels } from '@src/lib/chat/fallbackModels';
-import { NVIDIA_KEY_NAMES, OPENROUTER_KEY_NAMES, readApiKey } from '@src/lib/chat/keys';
+import { NVIDIA_KEY_NAMES, readApiKey, readOpenRouterKeys, shouldRotateOpenRouterKey } from '@src/lib/chat/keys';
 import { classifyProviderFailure, composeFinalError } from '@src/lib/chat/providerErrors';
 import { retryOnce } from '@src/lib/chat/retry';
 import { createThinkingSplitter } from '@src/lib/chat/thinking';
@@ -235,15 +235,7 @@ async function tryNvidiaStream({ messages, enableThinking, env, fetchImpl, onEve
   }
 }
 
-async function tryOpenRouterStream({ messages, enableThinking, env, fetchImpl, onEvent }) {
-  const apiKey = readApiKey(OPENROUTER_KEY_NAMES, env);
-  if (!apiKey) {
-    return classifyProviderFailure({
-      provider: 'openrouter',
-      missingKey: true,
-    });
-  }
-
+async function tryOpenRouterStreamWithKey({ apiKey, messages, enableThinking, env, fetchImpl, onEvent }) {
   try {
     const response = await fetchWithTimeout(fetchImpl, OPENROUTER_ENDPOINT, {
       method: 'POST',
@@ -299,9 +291,49 @@ async function tryOpenRouterStream({ messages, enableThinking, env, fetchImpl, o
   }
 }
 
+async function tryOpenRouterStream({ messages, enableThinking, env, fetchImpl, onEvent }) {
+  const keys = readOpenRouterKeys(env);
+  if (keys.length === 0) {
+    return classifyProviderFailure({
+      provider: 'openrouter',
+      missingKey: true,
+    });
+  }
+
+  let lastFailure = classifyProviderFailure({
+    provider: 'openrouter',
+    missingKey: true,
+  });
+
+  for (let index = 0; index < keys.length; index += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await tryOpenRouterStreamWithKey({
+      apiKey: keys[index],
+      messages,
+      enableThinking,
+      env,
+      fetchImpl,
+      onEvent,
+    });
+
+    if (result.ok) return result;
+
+    lastFailure = result;
+    if (result.hasOutput) return result;
+
+    const hasNextKey = index < keys.length - 1;
+    if (!hasNextKey || !shouldRotateOpenRouterKey(result)) {
+      return result;
+    }
+  }
+
+  return lastFailure;
+}
+
 export async function runChatCompletions({ messages, enableThinking = true, env = process.env, fetchImpl = fetch, onEvent = () => {}, sleepFn }) {
   const nvidiaKey = readApiKey(NVIDIA_KEY_NAMES, env);
-  const openRouterKey = readApiKey(OPENROUTER_KEY_NAMES, env);
+  const openRouterKeys = readOpenRouterKeys(env);
+  const openRouterKey = openRouterKeys[0] || '';
 
   if (!nvidiaKey && !openRouterKey) {
     const nvidia = classifyProviderFailure({

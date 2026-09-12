@@ -200,4 +200,67 @@ describe('runChatCompletions', () => {
     expect(content).toBe('Halo dari zoom.');
     expect(JSON.stringify(events)).not.toMatch(/\{thinking\}/);
   });
+
+  it('rotates to the next OpenRouter key on 401 then succeeds', async () => {
+    const events = [];
+    const usedKeys = [];
+    const fetchImpl = vi.fn(async (url, options) => {
+      if (String(url).includes('nvidia.com')) {
+        return jsonErrorResponse(503, { error: 'ResourceExhausted' });
+      }
+      usedKeys.push(options.headers.Authorization);
+      if (options.headers.Authorization === 'Bearer sk-or-v1-bad') {
+        return jsonErrorResponse(401, 'Unauthorized');
+      }
+      if (options.headers.Authorization === 'Bearer sk-or-v1-good') {
+        return streamResponse('ok-from-pool');
+      }
+      throw new Error('unexpected OpenRouter key');
+    });
+
+    const result = await runChatCompletions({
+      messages: [{ role: 'user', content: 'hi' }],
+      env: {
+        NVIDIA_API_KEY: 'nvapi-test',
+        OPENROUTER_API_KEY: 'sk-or-v1-bad',
+        OPENROUTER_API_KEYS: 'sk-or-v1-good,sk-or-v1-spare',
+      },
+      fetchImpl,
+      onEvent: (event) => events.push(event),
+      sleepFn: async () => {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(usedKeys).toEqual(['Bearer sk-or-v1-bad', 'Bearer sk-or-v1-good']);
+    expect(events.some((event) => event.type === 'meta' && event.provider === 'openrouter')).toBe(true);
+    expect(JSON.stringify(events)).not.toMatch(/sk-or-v1/);
+  });
+
+  it('rotates OpenRouter keys on 429 quota errors', async () => {
+    const usedKeys = [];
+    const fetchImpl = vi.fn(async (url, options) => {
+      if (String(url).includes('nvidia.com')) {
+        return jsonErrorResponse(401, 'Unauthorized');
+      }
+      usedKeys.push(options.headers.Authorization);
+      if (usedKeys.length === 1) {
+        return jsonErrorResponse(429, { error: { message: 'quota exceeded' } });
+      }
+      return streamResponse('rotated');
+    });
+
+    const result = await runChatCompletions({
+      messages: [{ role: 'user', content: 'hi' }],
+      env: {
+        NVIDIA_API_KEY: 'nvapi-bad',
+        OPENROUTER_API_KEYS: 'sk-or-v1-one\nsk-or-v1-two',
+      },
+      fetchImpl,
+      onEvent: () => {},
+      sleepFn: async () => {},
+    });
+
+    expect(result.ok).toBe(true);
+    expect(usedKeys).toEqual(['Bearer sk-or-v1-one', 'Bearer sk-or-v1-two']);
+  });
 });

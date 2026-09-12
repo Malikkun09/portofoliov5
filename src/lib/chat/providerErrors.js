@@ -33,7 +33,7 @@ export function redactSecrets(text) {
     .replace(/\b(nvapi-[A-Za-z0-9_-]+)/gi, '[redacted]')
     .replace(/\b(sk-or-v1-[A-Za-z0-9_-]+)/gi, '[redacted]')
     .replace(/\b(sk-[A-Za-z0-9_-]{12,})/gi, '[redacted]')
-    .replace(/\b(NVIDIA_API_KEY|NVAPI_KEY|OPENROUTER_API_KEY)\s*=\s*\S+/gi, '$1=[redacted]');
+    .replace(/\b(NVIDIA_API_KEY|NVAPI_KEY|OPENROUTER_API_KEY|OPENROUTER_API_KEYS)\s*=\s*\S+/gi, '$1=[redacted]');
 }
 
 function bodyHaystack(bodyText) {
